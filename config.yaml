@@ -1,5 +1,6 @@
 experiment:
   db_path: tests/fixedness_test/database/rich_test.db
+  scenario: rich_medical        # scenario YAML in fixedness/scenarios/ (omit .yaml)
   mode: real
   real:
     limit: 0                   # 0 = tutti i record; N > 0 = sottoinsieme di N

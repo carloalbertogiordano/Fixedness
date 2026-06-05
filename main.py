@@ -74,7 +74,7 @@ def run_deanon_audit():
     print(f"Auditing {len(tasks)} identities ({n_cores} workers, oracle={len(df_ora)} rows)...")
 
     with open(csv_path, 'w') as f:
-        f.write("record,identity,fixedness,sponginess,candidates,status,solve_ms\n")
+        f.write("record,identity,fixedness,sponginess,candidates,status,solve_ms,promotion_source\n")
 
     # Pool senza initializer — fork eredita i globals dal padre
     with multiprocessing.Pool(processes=n_cores) as pool:
@@ -85,7 +85,8 @@ def run_deanon_audit():
                 ]
                 row = (f"{r_id},{real_identity},"
                        f"{res['fixedness']},{res['sponginess']},"
-                       f"{res['candidates']},{res['status']},{res['solve_ms']}\n")
+                       f"{res['candidates']},{res['status']},{res['solve_ms']},"
+                       f"{res['promotion_source']}\n")
                 with open(csv_path, 'a') as f:
                     f.write(row)
                     f.flush()

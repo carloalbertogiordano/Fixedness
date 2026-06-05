@@ -1,0 +1,78 @@
+# Adversarial scenario: schema incompleteness attack.
+#
+# The solver knows only the structural FDs (Zip→City, Diagnosis→Treatment, etc.)
+# but is blind to the clinical threshold FDs (HbA1c↔Diagnosis, Pressione↔Diagnosis).
+# A real attacker with clinical domain knowledge can exploit these hidden FDs,
+# causing the framework to underestimate fixedness for records where HbA1c or
+# Pressione uniquely determines the diagnosis.
+#
+# Compare fixedness scores against rich_medical.yaml to quantify the gap.
+
+target_table: patients
+oracle_table: persons
+join_key: person_id
+identity_col: tax_code
+
+target_col_map:
+  age:                  Age
+  sex:                  Sesso
+  city:                 City
+  zip:                  Zip
+  region:               Region
+  job:                  Job
+  bmi:                  BMI
+  smoking_status:       Fumatore
+  physical_activity:    Attivita
+  diagnosis:            Diagnosis
+  treatment:            Treatment
+  drug_class:           DrugClass
+  insurance_tier:       InsuranceTier
+  hba1c:                HbA1c
+  ldl:                  LDL
+  glicemia_digiuno:     Glicemia_Digiuno
+  pressione_sistolica:  Pressione
+  risk_score:           RiskScore
+
+oracle_col_map:
+  sex:    Sesso
+  city:   City
+  zip:    Zip
+  region: Region
+  job:    Job
+
+functional_dependencies:
+  # ── Exact FDs only — no clinical threshold FDs ──────────────────────────────
+  - det: Diagnosis
+    dep: Treatment
+    type: exact
+
+  - det: Diagnosis
+    dep: DrugClass
+    type: exact
+
+  - det: Diagnosis
+    dep: InsuranceTier
+    type: exact
+
+  - det: DrugClass
+    dep: InsuranceTier
+    type: exact
+
+  - det: Zip
+    dep: City
+    type: exact
+
+  - det: Zip
+    dep: Region
+    type: exact
+
+  - det: InsuranceTier
+    dep: DrugClass
+    type: restriction
+    map:
+      Base:     [Nessuno, Antivirali_FANS]
+      Standard: [Nessuno, Antivirali_FANS, Antiipertensivi]
+      Premium:  [Nessuno, Antivirali_FANS, Antiipertensivi, Anticoagulanti, Ipoglicemizzanti]
+
+  # HbA1c ↔ Diagnosis: OMITTED (hidden from solver, known to attacker)
+  # Pressione ↔ Diagnosis: OMITTED (hidden from solver, known to attacker)

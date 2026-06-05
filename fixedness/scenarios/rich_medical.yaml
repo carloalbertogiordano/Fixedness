@@ -1,0 +1,92 @@
+target_table: patients
+oracle_table: persons
+join_key: person_id
+identity_col: tax_code
+
+target_col_map:
+  age:                  Age
+  sex:                  Sesso
+  city:                 City
+  zip:                  Zip
+  region:               Region
+  job:                  Job
+  bmi:                  BMI
+  smoking_status:       Fumatore
+  physical_activity:    Attivita
+  diagnosis:            Diagnosis
+  treatment:            Treatment
+  drug_class:           DrugClass
+  insurance_tier:       InsuranceTier
+  hba1c:                HbA1c
+  ldl:                  LDL
+  glicemia_digiuno:     Glicemia_Digiuno
+  pressione_sistolica:  Pressione
+  risk_score:           RiskScore
+
+oracle_col_map:
+  sex:    Sesso
+  city:   City
+  zip:    Zip
+  region: Region
+  job:    Job
+
+functional_dependencies:
+  # ── Exact FDs (derived from ground-truth data) ──────────────────────────────
+  - det: Diagnosis
+    dep: Treatment
+    type: exact
+
+  - det: Diagnosis
+    dep: DrugClass
+    type: exact
+
+  - det: Diagnosis
+    dep: InsuranceTier
+    type: exact
+
+  - det: DrugClass
+    dep: InsuranceTier
+    type: exact
+
+  - det: Zip
+    dep: City
+    type: exact
+
+  - det: Zip
+    dep: Region
+    type: exact
+
+  # ── Restriction: InsuranceTier → allowed DrugClass (cycle with DrugClass→InsuranceTier)
+  - det: InsuranceTier
+    dep: DrugClass
+    type: restriction
+    map:
+      Base:     [Nessuno, Antivirali_FANS]
+      Standard: [Nessuno, Antivirali_FANS, Antiipertensivi]
+      Premium:  [Nessuno, Antivirali_FANS, Antiipertensivi, Anticoagulanti, Ipoglicemizzanti]
+
+  # ── Threshold FD: HbA1c ↔ Diagnosis (bidirectional) ────────────────────────
+  - det: HbA1c
+    dep: Diagnosis
+    type: numeric_to_categorical
+    threshold: 6.5
+    high_vals: [Diabete]
+
+  - det: Diagnosis
+    dep: HbA1c
+    type: categorical_to_numeric
+    threshold: 6.5
+    high_det_vals: [Diabete]
+
+  # ── Threshold FD: Pressione ↔ Diagnosis (bidirectional) ────────────────────
+  - det: Pressione
+    dep: Diagnosis
+    type: numeric_to_categorical
+    threshold: 130
+    high_vals: [Ipertensione, Cardiopatia]
+
+  - det: Diagnosis
+    dep: Pressione
+    type: categorical_to_numeric
+    threshold: 130
+    high_det_vals: [Ipertensione, Cardiopatia]

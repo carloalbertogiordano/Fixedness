@@ -159,7 +159,7 @@ def smt_linkage_worker(args):
     conflicts    = _post('conflicts')    - _pre('conflicts')
     decisions    = _post('decisions')    - _pre('decisions')
     propagations = _post('propagations') - _pre('propagations')
-    fixedness    = 1.0 if res == z3.unsat else 0.0
+    smt_fixed = (res == z3.unsat)
 
     solver.pop()   # rimuove vincolo identity != true_link_idx
     solver.pop()   # rimuove knowledge_map di questo record
@@ -175,18 +175,31 @@ def smt_linkage_worker(args):
         true_link_idx   = true_link_idx,
     )
 
-    if fixedness < 1.0 and n_c == 1:
-        fixedness = 1.0
+    ac3_fixed = (n_c == 1)
+
+    if smt_fixed and ac3_fixed:
+        fixedness  = 1.0
+        promotion  = 'both'
+    elif smt_fixed:
+        fixedness  = 1.0
+        promotion  = 'smt'
+    elif ac3_fixed:
+        fixedness  = 1.0
+        promotion  = 'ac3'
+    else:
+        fixedness  = 0.0
+        promotion  = 'none'
 
     sponginess = 1.0 / n_c  # P_guess: prob. of correct re-identification (n_c >= 1 guaranteed)
 
     return r_id, {
-        'fixedness':    fixedness,
-        'sponginess':   sponginess,
-        'status':       str(res),
-        'candidates':   n_c,
-        'solve_ms':     round(z3_ms, 2),
-        'conflicts':    conflicts,
-        'decisions':    decisions,
-        'propagations': propagations,
+        'fixedness':         fixedness,
+        'sponginess':        sponginess,
+        'status':            str(res),
+        'candidates':        n_c,
+        'solve_ms':          round(z3_ms, 2),
+        'conflicts':         conflicts,
+        'decisions':         decisions,
+        'propagations':      propagations,
+        'promotion_source':  promotion,
     }
