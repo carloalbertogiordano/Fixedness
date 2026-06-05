@@ -73,7 +73,9 @@ python main.py
 ```
 
 Results are written to `results/<timestamp>/full_audit.csv` with columns:
-`record, identity, fixedness, sponginess, candidates, status, solve_ms`
+`record, identity, fixedness, sponginess, candidates, status, solve_ms, promotion_source`
+
+`promotion_source` indicates which phase determined fixedness=1: `smt` (Z3 UNSAT proof), `ac3` (single oracle candidate), `both`, or `none`.
 
 ### Configuration
 
@@ -95,7 +97,13 @@ Edit `config.yaml`:
 
 ## Synthetic database
 
-The pre-generated CSVs in `database/` encode a realistic medical scenario (SEED=42):
+All data in `database/` is **fully synthetic** — no real individuals are represented.
+
+- Names, tax codes, addresses, phone numbers, and emails are generated algorithmically from fixed lookup tables using `numpy`/`random` with SEED=42. While the generated codice fiscale strings follow the Italian format, they are not validated against any real registry and carry no information about real people.
+- Consumer spending scores are sampled from the [Mall Customer Segmentation dataset](https://www.kaggle.com/datasets/vjchoudhary7/customer-segmentation-tutorial-in-python) (200 rows, public domain, no PII — only age, income, and spending score). No rows from that dataset appear in the output CSVs; it is used solely to parameterize the spending-score distribution.
+- Medical, clinical, and social data are generated from epidemiological models and have no relation to any real patient.
+
+The pre-generated CSVs encode a realistic medical scenario (SEED=42):
 
 | Table | Role | Rows |
 |-------|------|------|
@@ -130,6 +138,17 @@ $$\sigma(R) = 1 - \frac{|C(R)|}{|O|}$$
 
 High sponginess + fixedness = 1 → deterministic re-identification.  
 Low sponginess (many candidates) → attacker is lost in the oracle noise.
+
+---
+
+## Attack scenarios
+
+Scenarios are declared in `fixedness/scenarios/` as YAML files. Each scenario specifies the target and oracle tables, the join key (hidden ground truth), and the functional dependencies registered with the solver. To switch scenario, set `experiment.scenario` in `config.yaml`.
+
+| Scenario | File | FDs registered | Purpose |
+|----------|------|---------------|---------|
+| Full threat model | `rich_medical.yaml` | 11 (all known FDs) | Standard audit |
+| Schema incompleteness | `rich_medical_blind_fd.yaml` | 7 (HbA1c↔Diagnosis and Pressione↔Diagnosis omitted) | Adversarial: solver blind to clinical threshold FDs that a domain-expert attacker can exploit; compare fixedness scores against full scenario to quantify the underestimation gap |
 
 ---
 
