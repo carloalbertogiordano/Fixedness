@@ -1,0 +1,205 @@
+experiment:
+  db_path: tests/fixedness_test/database/rich_test.db
+  mode: real
+  real:
+    limit: 0                   # 0 = tutti i record; N > 0 = sottoinsieme di N
+    sampling_strategy: random  # first | random (random usa _seed per riproducibilità)
+  anonymization:
+    method: mondrian_k        # no_anonymization | suppression | mondrian_k |
+                              # l_diversity | t_closeness |
+                              # noise_addition | microaggregation | randomized_response |
+                              # laplace_dp | local_dp
+    k: 10
+    l: 3                      # l_diversity, t_closeness
+    t: 0.2                    # t_closeness (total variation distance threshold)
+    epsilon: 1.0              # laplace_dp, local_dp
+    sigma: 3                  # noise_addition (std dev in domain-index space)
+    quasi_identifiers:
+      - Sesso
+      - Zip
+      - Job
+    sensitive_attributes:
+      - Diagnosis
+      - Treatment
+      - DrugClass
+      - InsuranceTier
+      - HbA1c
+      - Pressione
+    bk_sa: Diagnosis
+    background_knowledge_frac: 0.9
+  batch_size_cells: 200
+  sampling_k: 10
+system:
+  max_cores: 12
+  ram_per_core_gb: 2
+  sat_timeout_sec: 0            # 0 = nessun timeout (illimitato)
+
+# ── Sweep configuration ──────────────────────────────────────────────────────
+sweep:
+  defaults:
+    k: 5
+    oracle_noise: 50
+    n_patients: 50
+    bk_frac: 0.9
+    method: mondrian_k
+    l: 2
+    t: 0.2
+    epsilon: 1.0
+    sigma: 3
+
+  # Semi per sweep multiseed
+  seeds: [42, 123, 777, 1337, 9999, 31415, 2718, 23947, 349, 0]
+
+  # smoke test (run_test.py)
+  smoke_test:
+    n_records: 5
+    oracle_cap: 200
+
+  # sweep_test.py — un parametro alla volta, nessun seed
+  basic:
+    - param: k
+      values: [1, 2, 3, 5, 10, 15, 25, 50]
+    - param: bk_frac
+      values: [0.0, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0]
+    - param: oracle_noise
+      values: [0, 10, 25, 35, 50, 75, 100, 150, 300, 1000]
+    - param: n_patients
+      values: [10, 20, 30, 40, 50, 70, 100, 200, 300]
+    - param: method
+      values:
+        - no_anonymization
+        - suppression
+        - mondrian_k
+        - l_diversity
+        - t_closeness
+        - noise_addition
+        - microaggregation
+        - randomized_response
+        - laplace_dp
+        - local_dp
+
+  # sweep_methods.py — per-method parameter sweep
+  methods:
+    - sweep_param: k
+      method: l_diversity
+      values: [2, 5, 10, 25, 50]
+    - sweep_param: k
+      method: t_closeness
+      values: [2, 5, 10, 25, 50]
+    - sweep_param: k
+      method: suppression
+      values: [2, 5, 10, 25, 50]
+    - sweep_param: k
+      method: microaggregation
+      values: [2, 5, 10, 25, 50]
+    - sweep_param: epsilon
+      method: laplace_dp
+      values: [0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+    - sweep_param: epsilon
+      method: local_dp
+      values: [0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+    - sweep_param: sigma
+      method: noise_addition
+      values: [1, 2, 3, 5, 10, 20]
+
+  # sweep_multiseed.py — con varianza tra semi
+  multiseed:
+    - param: k
+      values: [1, 2, 3, 4, 5, 6, 7, 10, 15, 25, 50, 100]
+    - param: oracle_noise
+      values: [0, 1, 2, 5, 10, 15, 20, 25, 50, 100, 300, 1000, 3000, 10000]
+    - param: n_patients
+      values: [5, 10, 15, 20, 50, 100, 200, 300, 500, 750, 1000, 2000, 5000]
+    - param: bk_frac
+      values: [0.0, 0.01, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0]
+    - param: method
+      values:
+        - no_anonymization
+        - mondrian_k
+        - l_diversity
+        - t_closeness
+        - microaggregation
+        - laplace_dp
+        - local_dp
+        - suppression
+        - noise_addition
+        - randomized_response
+    - param: epsilon
+      values: [0.001, 0.005, 0.01, 0.1, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 100.0, 1000.0]
+      fixed: {method: laplace_dp}
+    - param: epsilon
+      values: [0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 100.0, 1000.0]
+      fixed: {method: local_dp}
+    - param: sigma
+      values: [0, 1, 2, 3, 5, 10, 20, 50, 100]
+      fixed: {method: noise_addition}
+    - param: l
+      values: [1, 2, 3, 5, 10, 20, 50]
+      fixed: {method: l_diversity}
+    - param: t
+      values: [0.0, 0.01, 0.05, 0.1, 0.2, 0.3, 0.5, 0.8, 1.0]
+      fixed: {method: t_closeness}
+
+  # sweep_timing.py — misurazione runtime Z3 + AC-3
+  timing:
+    - param: k
+      values: [2, 5, 10, 25, 50, 100]
+    - param: oracle_noise
+      values: [0, 25, 100, 300, 1000, 3000]
+    - param: n_patients
+      values: [20, 50, 100, 200, 500, 1000, 5000]
+
+  # sweep_crossproduct.py — griglia completa k × method
+  crossproduct:
+    k_values: [1, 2, 3, 4, 5, 6, 7, 10, 15, 25, 50, 100]
+    methods:
+      - no_anonymization
+      - mondrian_k
+      - l_diversity
+      - t_closeness
+      - microaggregation
+      - laplace_dp
+      - local_dp
+      - suppression
+      - noise_addition
+      - randomized_response
+
+  # sweep_qi.py — varia il set di quasi-identifiers × k
+  qi_sets:
+    - name: zip_only
+      qi: [Zip]
+    - name: sex_zip
+      qi: [Sesso, Zip]
+    - name: sex_zip_job
+      qi: [Sesso, Zip, Job]
+    - name: sex_city_zip_job
+      qi: [Sesso, City, Zip, Job]
+    - name: all_qi
+      qi: [Sesso, City, Zip, Region, Job]
+
+  qi:
+    k_values: [1, 2, 3, 4, 5, 6, 7, 10, 25, 50]
+    method: mondrian_k
+
+  # sweep_bksa.py — varia il sensitive attribute usato come background knowledge
+  bksa:
+    bk_sa_values: [Diagnosis, Treatment, DrugClass, InsuranceTier]
+    k_values: [2, 5, 10, 25, 50]
+    method: mondrian_k
+
+  # sweep_oracle.py — sensibilità oracle: noise×method, bkfrac×method, griglia 2D
+  oracle:
+    oracle_noise_values: [0, 1, 5, 10, 15, 20, 25, 50, 100, 300, 1000, 5000]
+    bk_frac_values: [0.0, 0.01, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0]
+    methods:
+      - no_anonymization
+      - mondrian_k
+      - l_diversity
+      - t_closeness
+      - microaggregation
+      - laplace_dp
+      - local_dp
+      - suppression
+      - noise_addition
+      - randomized_response
+    grid_method: mondrian_k   # metodo per la griglia 2D oracle_noise × bk_frac
