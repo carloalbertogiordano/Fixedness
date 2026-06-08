@@ -909,30 +909,30 @@ def cb_rho(method, k):
             marker=dict(size=6, symbol='circle-open'),
         ), secondary_y=False)
 
-        # Effective ρ — dal CSV rho (generato con metodo e k selezionati)
-        if 'effective_rho' in df.columns:
-            # Filtra per method e k se le colonne esistono nel CSV
-            sub = df.copy()
-            if 'method' in df.columns and method:
-                sub = sub[sub['method'] == method]
-            if 'k' in df.columns and k is not None:
-                sub = sub[sub['k'] == k]
-            sub = sub.sort_values('n_patients')
-            if not sub.empty:
-                m_label = method or 'mondrian_k'
-                k_label = k or '?'
+        # Effective ρ — una linea per metodo, filtrate per k selezionato
+        if 'effective_rho' in df.columns and 'method' in df.columns:
+            df_k = df[df['k'] == k] if ('k' in df.columns and k is not None) else df
+            for m in sorted(df_k['method'].unique()):
+                sub = df_k[df_k['method'] == m].sort_values('n_patients')
+                if sub.empty:
+                    continue
+                is_selected = (m == method)
                 fig_l.add_trace(go.Scatter(
                     x=sub['n_patients'], y=sub['effective_rho'], mode='lines+markers',
-                    name=f'Effective ρ ({m_label}, k={k_label})',
-                    line=dict(color=ACCENT, width=3),
-                    marker=dict(size=9, line=dict(width=1, color='white')),
+                    name=f'Effective ρ — {m}',
+                    line=dict(color=MC.get(m, ACCENT), width=3 if is_selected else 1.5,
+                              dash='solid' if is_selected else 'dot'),
+                    marker=dict(size=9 if is_selected else 5,
+                                line=dict(width=1, color='white')),
+                    visible=True if is_selected else 'legendonly',
                 ), secondary_y=False)
 
-            # Retention ratio su asse secondario (opzionale, legendonly)
-            if 'retention_ratio' in sub.columns and not sub.empty:
+            # Retention ratio del metodo selezionato — asse secondario
+            sub_sel = df_k[df_k['method'] == method].sort_values('n_patients') if method else pd.DataFrame()
+            if 'retention_ratio' in df.columns and not sub_sel.empty:
                 fig_l.add_trace(go.Scatter(
-                    x=sub['n_patients'], y=sub['retention_ratio'], mode='lines',
-                    name='Retention ratio (ρ_eff / ρ)',
+                    x=sub_sel['n_patients'], y=sub_sel['retention_ratio'], mode='lines',
+                    name=f'Retention ratio — {method}',
                     line=dict(color='#2E7D52', width=1.5, dash='dot'),
                     visible='legendonly',
                 ), secondary_y=True)
