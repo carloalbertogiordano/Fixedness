@@ -11,14 +11,30 @@ from dash import Dash, dcc, html, Input, Output
 
 GF_URL = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Lora:ital@0;1&display=swap'
 
-RESULTS_DIR = 'tests/fixedness_test/results'
+_HERE = os.path.dirname(os.path.abspath(__file__))
+RESULTS_DIR = os.path.join(_HERE, '..', 'results')
 
 
 def _latest_csv(prefix):
-    for d in reversed(sorted(glob.glob(f'{RESULTS_DIR}/{prefix}_*/'))):
-        csvs = glob.glob(f'{d}*.csv')
+    for d in reversed(sorted(glob.glob(os.path.join(RESULTS_DIR, f'{prefix}_*/')))):
+        csvs = glob.glob(os.path.join(d, '*.csv'))
         if csvs:
             return pd.read_csv(csvs[0])
+    return None
+
+
+def _latest_audit_rho():
+    """Read rho and effective_rho from the latest full_audit.csv (single run values)."""
+    for d in reversed(sorted(glob.glob(os.path.join(RESULTS_DIR, '*/')))):
+        csvs = glob.glob(os.path.join(d, 'full_audit.csv'))
+        if csvs:
+            df = pd.read_csv(csvs[0])
+            if 'rho' in df.columns:
+                return {
+                    'rho':          float(df['rho'].iloc[0]),
+                    'effective_rho': float(df['effective_rho'].iloc[0]) if 'effective_rho' in df.columns else None,
+                    'n_records':    len(df),
+                }
     return None
 
 
@@ -28,8 +44,9 @@ QI   = _latest_csv('qi')
 BKSA = _latest_csv('bksa')
 TIM  = _latest_csv('timing')
 ORA  = _latest_csv('oracle')
-RHO    = _latest_csv('rho')
-RHO_QI = _latest_csv('rho_qi')
+RHO       = _latest_csv('rho')
+RHO_QI    = _latest_csv('rho_qi')
+AUDIT_RHO = _latest_audit_rho()   # rho from latest full_audit.csv (actual run)
 
 # Normalizza nomi colonne timing vecchio formato
 if TIM is not None and 'mean_ms' in TIM.columns:
@@ -919,6 +936,23 @@ def cb_rho(method, k):
                     line=dict(color='#2E7D52', width=1.5, dash='dot'),
                     visible='legendonly',
                 ), secondary_y=True)
+
+        # ρ e effective ρ dall'ultimo audit reale (main.py) — punto singolo
+        if AUDIT_RHO is not None:
+            n_run = AUDIT_RHO['n_records']
+            fig_l.add_trace(go.Scatter(
+                x=[n_run], y=[AUDIT_RHO['rho']], mode='markers',
+                name=f'ρ audit reale (N={n_run})',
+                marker=dict(color='#B83232', size=14, symbol='star',
+                            line=dict(width=1.5, color='white')),
+            ), secondary_y=False)
+            if AUDIT_RHO.get('effective_rho') is not None:
+                fig_l.add_trace(go.Scatter(
+                    x=[n_run], y=[AUDIT_RHO['effective_rho']], mode='markers',
+                    name=f'Effective ρ audit reale (N={n_run})',
+                    marker=dict(color=ACCENT, size=14, symbol='star',
+                                line=dict(width=1.5, color='white')),
+                ), secondary_y=False)
 
         fig_l.add_hline(y=4.27, line_dash='dash', line_color='#B83232', line_width=1.5,
                         annotation_text='ρ* ≈ 4.27',
