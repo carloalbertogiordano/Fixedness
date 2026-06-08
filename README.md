@@ -15,22 +15,65 @@ fixedness/
 │   ├── loader.py          # DB loader, attack scenario setup
 │   └── models.py          # Core data structures (Database, Attribute, Record)
 ├── sat/
-│   └── translator.py      # LIA encoding for Z3, analytical rho computation
+│   └── translator.py      # LIA encoding for Z3, rho + effective rho computation
 ├── audit/
 │   ├── worker.py          # Per-record SMT+AC-3 worker (multiprocessing)
 │   └── candidate_filter.py # OracleIndex, PartitionCache, AC-3 pruning
-└── anonymizers/
-    ├── base.py            # Abstract anonymizer
-    ├── factory.py         # Method dispatch
-    ├── syntactic.py       # Mondrian k-anonymity, l-diversity, t-closeness
-    ├── formal.py          # Laplace DP, local DP
-    └── perturbative.py    # Noise addition, microaggregation, randomized response
+├── anonymizers/
+│   ├── base.py            # Abstract anonymizer
+│   ├── factory.py         # Method dispatch
+│   ├── syntactic.py       # Mondrian k-anonymity, l-diversity, t-closeness
+│   ├── formal.py          # Laplace DP, local DP
+│   └── perturbative.py    # Noise addition, microaggregation, randomized response
+└── scenarios/
+    ├── rich_medical.yaml       # Full threat model (11 FDs, all constraint channels)
+    └── rich_medical_blind_fd.yaml  # Adversarial: omits clinical threshold FDs
 main.py                    # Entry point — full linkage audit
 config.yaml                # All parameters (method, k, QI set, sweep config)
 scripts/
 └── build_rich_db.py       # Regenerate the 8-table synthetic DB + CSVs from scratch
 database/                  # Pre-generated CSVs (synthetic, SEED=42)
+experiments/
+├── run_all_sweeps.sh      # Run all sweeps in sequence (bash experiments/run_all_sweeps.sh)
+├── dashboard.py           # Interactive Dash dashboard — visualizes all sweep results
+├── parallel_runner.py     # Shared multiprocessing sweep harness
+├── sweep_rho.py           # Phase transition ρ vs N (analytical + effective ρ)
+├── sweep_rho_qi.py        # ρ vs N for each QI set configuration
+├── sweep_crossproduct.py  # Full k × method grid
+├── sweep_multiseed.py     # Multi-seed variance estimation (10 seeds)
+├── sweep_oracle.py        # Oracle noise × method sensitivity
+├── sweep_qi.py            # QI set richness sweep
+├── sweep_bksa.py          # Background knowledge SA type sweep
+├── sweep_methods.py       # Per-method parameter sweep (k, ε, σ)
+├── sweep_timing.py        # SMT + AC-3 runtime measurement
+└── sweep_test.py          # Single-parameter sweep (no seeds, fast)
 ```
+
+---
+
+## Running experiments
+
+All sweep scripts are in `experiments/` and must be run from the repo root (`tests/fixedness_test/`):
+
+```bash
+# Run all sweeps in sequence
+bash experiments/run_all_sweeps.sh
+
+# Run a specific sweep
+.venv/bin/python experiments/sweep_rho.py
+
+# Skip a sweep
+bash experiments/run_all_sweeps.sh --skip timing
+
+# Run only one sweep
+bash experiments/run_all_sweeps.sh --only rho
+
+# Launch the dashboard (reads latest CSV from results/)
+.venv/bin/python experiments/dashboard.py
+# → http://localhost:8050
+```
+
+Each sweep writes results to `results/<sweep>_YYYYMMDD_HHMMSS/`. The dashboard auto-detects the latest file for each sweep type.
 
 ---
 
