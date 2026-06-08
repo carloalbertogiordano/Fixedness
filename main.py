@@ -10,7 +10,7 @@ from fixedness.anonymizers import get_anonymization_map
 import fixedness.audit.worker as _wmod
 from fixedness.audit.worker import smt_linkage_worker
 from fixedness.audit.candidate_filter import OracleIndex, PartitionCache
-from fixedness.sat.translator import SATTranslator, compute_rho_analytical
+from fixedness.sat.translator import SATTranslator, compute_rho_analytical, compute_effective_rho
 
 
 def run_deanon_audit():
@@ -48,15 +48,20 @@ def run_deanon_audit():
     )
 
     # 3. Anonimizzazione
-    print(f"Applying Mondrian (k={config['experiment']['anonymization']['k']})...")
+    print(f"Applying {config['experiment']['anonymization'].get('method', 'mondrian_k')}...")
     knowledge_map = get_anonymization_map(db, df_med, config)
 
-    # 4. Setta globals nel padre — figli ereditano via fork COW, zero pickle
+    # 4. Effective rho (weighted by knowledge_map)
+    eff_rho = compute_effective_rho(db, knowledge_map, rho_info)
+    print(f"[SAT] Effective rho: {eff_rho:.4f} (retention: {eff_rho/rho_info['rho']*100:.1f}%)")
+
+    # 5. Setta globals nel padre — figli ereditano via fork COW, zero pickle
     _wmod._db            = db
     _wmod._knowledge_map = knowledge_map
     _wmod._col_mapping   = col_mapping
     _wmod._oracle_index  = OracleIndex(df_ora, db, col_mapping)
     _wmod._part_cache    = PartitionCache()
+
 
     res_dir  = os.path.join(_here, 'results', datetime.now().strftime('%Y%m%d_%H%M%S'))
     os.makedirs(res_dir, exist_ok=True)
@@ -74,10 +79,11 @@ def run_deanon_audit():
     print(f"Auditing {len(tasks)} identities ({n_cores} workers, oracle={len(df_ora)} rows)...")
 
     with open(csv_path, 'w') as f:
-        f.write("record,identity,fixedness,sponginess,candidates,status,solve_ms,promotion_source\n")
+        f.write("record,identity,fixedness,sponginess,candidates,status,solve_ms,promotion_source,rho,effective_rho\n")
 
-    # Pool senza initializer — fork eredita i globals dal padre
-    with multiprocessing.Pool(processes=n_cores) as pool:
+    # Pool con initializer per robustezza su diverse piattaforme/versioni python
+    init_args = (db, df_ora, col_mapping, knowledge_map)
+    with multiprocessing.Pool(processes=n_cores, initializer=_wmod.init_worker, initargs=init_args) as pool:
         with tqdm(total=len(tasks), desc="Linkage Audit") as pbar:
             for r_id, res in pool.imap_unordered(smt_linkage_worker, tasks, chunksize=1):
                 real_identity = db.attributes[id_attr_id].domain[
@@ -86,7 +92,8 @@ def run_deanon_audit():
                 row = (f"{r_id},{real_identity},"
                        f"{res['fixedness']},{res['sponginess']},"
                        f"{res['candidates']},{res['status']},{res['solve_ms']},"
-                       f"{res['promotion_source']}\n")
+                       f"{res['promotion_source']},{rho_info['rho']:.4f},{eff_rho:.4f}\n")
+
                 with open(csv_path, 'a') as f:
                     f.write(row)
                     f.flush()
